@@ -1,0 +1,97 @@
+---
+title: "Scrap Thyssen Malaga"
+author: "Fernando Muñoz"
+date: "12 de octubre de 2018"
+output: html_document
+---
+# Paquetes
+```{r}
+library(rvest)
+library(dplyr)
+library(stringr)
+```
+
+# Captura de enlaces
+```{r}
+base <- "https://www.carmenthyssenmalaga.org"
+url <- "https://www.carmenthyssenmalaga.org/obras/"
+
+href<-list()
+for (i in 1:100){
+  href[[i]] <- paste0(url, i) %>%
+    read_html() %>%
+    html_nodes("div.list li>a") %>%
+    html_attr("href")
+  if(length(href[[i]])==0){
+    break()
+  } else {
+    next()
+  }
+}
+```
+
+
+# Creación de enlaces
+```{r}
+enlaces<-lapply(href, function(href){
+  paste0(base, href)
+})
+enlaces<-unlist(enlaces)
+enlaces <- enlaces[-255]
+href<-unlist(href)
+```
+
+
+# Creación de una BDD
+```{r}
+BDD <- matrix(nrow = 1, ncol = 9) %>%
+  as.data.frame()
+colnames(BDD) <- c("Título", "Autor", "Fecha", "Técnica",
+                   "Dimensiones", "CTB", "Copyright", "Descripción",
+                   "Autortexto")
+for (i in 1:length(enlaces)){
+  html <- read_html(enlaces[i])
+  
+  nodes <- html_nodes(html, "div.template-work__description--resume h2")
+  BDD[i,1] <- html_text(nodes)
+  
+  nodes <- html_nodes(html, "div.template-work__description--resume h5")
+  autor <- html_text(nodes)
+  BDD[i,2] <- trimws(autor)
+  
+  nodes <- html_nodes(html, "div.template-work__description--resume span")
+  BDD[i,3] <- html_text(nodes)
+  
+  nodes <- html_nodes(html, "div.template-work__description--resume ul>li>p")
+  metadata <- html_text(nodes)
+  BDD[i,4] <- metadata[1]
+  BDD[i,5] <- metadata[2]
+  BDD[i,6] <- metadata[3]
+  BDD[i,7] <- metadata[4]
+  
+  nodes <- html_nodes(html, "div.template-work__description>p")
+  metadata <- html_text(nodes)
+  BDD[i,8] <- metadata[1:length(metadata)-1] %>%
+    paste(collapse = " ")
+  BDD[i,9] <- metadata[length(metadata)]
+  
+  nodes <- html_node(html, "#imageWork")
+  src <- html_attr(nodes, "src")
+  BDD[i, 10]<-paste0(base, src)
+  
+  Sys.sleep(3)
+}
+
+
+```
+
+
+# Descarga de imágenes
+```{r}
+for (i in 1:length(BDD$Imagen)){
+download.file(BDD$Imagen[i], 
+              destfile = basename(paste0(href[i], ".jpg")), 
+              mode = "wb")
+}
+```
+
